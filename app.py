@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
 # 初始化 Flask 應用程式
+# 我們指定 static_folder=None 是為了等一下可以自訂根目錄的路由
 app = Flask(__name__)
 CORS(app)  # 啟用 CORS，允許前端跨域請求
 
@@ -28,6 +29,14 @@ class Post(db.Model):
             'title': self.title,
             'content': self.content
         }
+
+# --- 網頁服務路由 ---
+
+@app.route('/')
+def serve_index():
+    # 當使用者訪問根目錄時，回傳 index.html 檔案
+    # '.' 代表目前的工作目錄
+    return send_from_directory('.', 'index.html')
 
 # --- RESTful API 路由 ---
 
@@ -87,6 +96,7 @@ def delete_post(post_id):
 
 # --- 主程式入口 ---
 if __name__ == '__main__':
+    from waitress import serve # 匯入 waitress
     with app.app_context():
         # 建立所有資料庫表格
         db.create_all()
@@ -100,5 +110,7 @@ if __name__ == '__main__':
             ]
             db.session.bulk_save_objects(initial_posts)
             db.session.commit()
-    # 執行應用程式
-    app.run(debug=True)
+    # 使用 waitress 作為正式環境的伺服器
+    print("啟動 Waitress 伺服器於 http://localhost:5000")
+    serve(app, host='0.0.0.0', port=5000)
+

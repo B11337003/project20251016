@@ -1,4 +1,5 @@
 virtual_environment/
+instance/
 # 虛擬環境
 __pycache__/
 
