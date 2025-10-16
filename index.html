@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的部落格</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 基本樣式，確保內容區域有最小高度 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #app {
+            min-height: calc(100vh - 8rem);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-gray-900 cursor-pointer" onclick="navigateTo('list')">我的部落格</h1>
+            <p class="text-gray-600">一個使用 Flask 和純 JavaScript 打造的簡單部落格</p>
+        </header>
+
+        <!-- 主要內容區域，將由 JavaScript 動態填充 -->
+        <main id="app" class="bg-white p-6 rounded-lg shadow-md">
+            <!-- 初始載入動畫 -->
+            <div id="loader" class="text-center">
+                <p>載入中...</p>
+            </div>
+        </main>
+        
+        <footer class="text-center mt-8 text-gray-500">
+            <p>&copy; 2025 部落格範例</p>
+        </footer>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000'; // 後端 API 的 URL
+        const app = document.getElementById('app');
+        const loader = document.getElementById('loader');
+
+        // --- 頁面渲染函式 ---
+
+        /**
+         * 顯示載入動畫
+         */
+        function showLoader() {
+            app.innerHTML = `<div class="text-center"><p>載入中...</p></div>`;
+        }
+        
+        /**
+         * 渲染文章列表頁面
+         */
+        async function renderPostList() {
+            showLoader();
+            try {
+                const response = await fetch(`${API_URL}/posts`);
+                if (!response.ok) throw new Error('無法取得文章列表');
+                const posts = await response.json();
+
+                let content = `
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">文章列表</h2>
+                        <button onclick="navigateTo('new')" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                            新增文章
+                        </button>
+                    </div>
+                `;
+
+                if (posts.length === 0) {
+                    content += '<p>目前沒有任何文章。</p>';
+                } else {
+                    content += '<ul class="space-y-4">';
+                    posts.forEach(post => {
+                        content += `
+                            <li class="p-4 border rounded-lg hover:bg-gray-50 transition duration-300">
+                                <a href="#" onclick="event.preventDefault(); navigateTo('post', ${post.id})" class="text-xl font-semibold text-blue-600 hover:underline">${post.title}</a>
+                            </li>
+                        `;
+                    });
+                    content += '</ul>';
+                }
+                app.innerHTML = content;
+            } catch (error) {
+                console.error('錯誤:', error);
+                app.innerHTML = `<p class="text-red-500">載入文章列表失敗，請確認後端伺服器是否已啟動。</p>`;
+            }
+        }
+
+        /**
+         * 渲染單篇文章頁面
+         * @param {number} postId 文章 ID
+         */
+        async function renderSinglePost(postId) {
+            showLoader();
+            try {
+                const response = await fetch(`${API_URL}/posts/${postId}`);
+                if (!response.ok) throw new Error('無法取得文章');
+                const post = await response.json();
+
+                app.innerHTML = `
+                    <article>
+                        <h2 class="text-3xl font-bold mb-4">${post.title}</h2>
+                        <div class="prose max-w-none text-gray-700 whitespace-pre-wrap">${post.content}</div>
+                    </article>
+                    <hr class="my-6">
+                    <div class="flex justify-start space-x-4">
+                        <button onclick="navigateTo('list')" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">回到列表</button>
+                        <button onclick="navigateTo('edit', ${post.id})" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">編輯文章</button>
+                        <button onclick="deletePost(${post.id})" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">刪除文章</button>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('錯誤:', error);
+                app.innerHTML = `<p class="text-red-500">載入文章失敗。</p>`;
+            }
+        }
+
+        /**
+         * 渲染文章表單（用於新增或編輯）
+         * @param {object|null} post - 如果是編輯模式，傳入文章物件；否則為 null
+         */
+        async function renderPostForm(post = null) {
+            const isEditing = post !== null;
+            const title = isEditing ? `編輯文章: ${post.title}` : '新增文章';
+            const buttonText = isEditing ? '儲存變更' : '建立文章';
+            const postId = isEditing ? post.id : '';
+            const postTitle = isEditing ? post.title : '';
+            const postContent = isEditing ? post.content : '';
+
+            app.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6">${title}</h2>
+                <form id="post-form" data-post-id="${postId}">
+                    <div class="mb-4">
+                        <label for="title" class="block text-gray-700 text-sm font-bold mb-2">標題</label>
+                        <input type="text" id="title" name="title" value="${postTitle}" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="content" class="block text-gray-700 text-sm font-bold mb-2">內容</label>
+                        <textarea id="content" name="content" rows="10" class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required>${postContent}</textarea>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-300">${buttonText}</button>
+                        <button type="button" onclick="navigateTo('list')" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-300">取消</button>
+                    </div>
+                </form>
+            `;
+            
+            document.getElementById('post-form').addEventListener('submit', handleFormSubmit);
+        }
+
+        // --- API 互動函式 ---
+
+        /**
+         * 處理表單提交（新增或更新）
+         * @param {Event} event
+         */
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const postId = form.dataset.postId;
+            const isEditing = !!postId;
+
+            const postData = {
+                title: form.title.value,
+                content: form.content.value
+            };
+            
+            const url = isEditing ? `${API_URL}/posts/${postId}` : `${API_URL}/posts`;
+            const method = isEditing ? 'PUT' : 'POST';
+
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(postData),
+                });
+                if (!response.ok) throw new Error('儲存失敗');
+                const savedPost = await response.json();
+                navigateTo('post', savedPost.id); // 成功後跳轉到該篇文章
+            } catch (error) {
+                console.error('錯誤:', error);
+                alert('儲存文章失敗！');
+            }
+        }
+
+        /**
+         * 刪除文章
+         * @param {number} postId
+         */
+        async function deletePost(postId) {
+            // 彈出確認對話框，防止誤刪
+            if (!confirm('您確定要刪除這篇文章嗎？')) {
+                return;
+            }
+            try {
+                const response = await fetch(`${API_URL}/posts/${postId}`, {
+                    method: 'DELETE',
+                });
+                if (!response.ok) throw new Error('刪除失敗');
+                alert('文章已刪除');
+                navigateTo('list'); // 刪除成功後回到列表
+            } catch (error) {
+                console.error('錯誤:', error);
+                alert('刪除文章失敗！');
+            }
+        }
+
+
+        // --- 頁面導航 ---
+        
+        /**
+         * 根據傳入的頁面名稱和參數，渲染對應的內容
+         * @param {string} page - 'list', 'post', 'new', 'edit'
+         * @param {number|null} id - 文章 ID，用於 'post' 和 'edit' 頁面
+         */
+        async function navigateTo(page, id = null) {
+            switch(page) {
+                case 'list':
+                    renderPostList();
+                    break;
+                case 'post':
+                    if (id) renderSinglePost(id);
+                    break;
+                case 'new':
+                    renderPostForm();
+                    break;
+                case 'edit':
+                    if (id) {
+                        showLoader();
+                        const response = await fetch(`${API_URL}/posts/${id}`);
+                        const post = await response.json();
+                        renderPostForm(post);
+                    }
+                    break;
+                default:
+                    renderPostList();
+            }
+        }
+
+        // --- 初始載入 ---
+        // 當頁面 DOM 載入完成後，首先顯示文章列表
+        document.addEventListener('DOMContentLoaded', () => {
+            navigateTo('list');
+        });
+
+    </script>
+</body>
+</html>

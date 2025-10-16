@@ -1,0 +1,14 @@
+virtual_environment/
+# 虛擬環境
+__pycache__/
+
+# 資料庫檔案
+*.db
+*.sqlite3
+
+# 環境變數檔案
+.env
+
+# IDE 或編輯器設定
+.vscode/
+.idea/
